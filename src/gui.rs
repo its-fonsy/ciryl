@@ -144,7 +144,19 @@ impl Gui {
         Ok(())
     }
 
-    pub fn print_vector(vector: &Vec<&str>, fixed_index: usize) -> Result<(), Error> {
+    pub fn print_debug(debug_messages: Vec<String>) -> Result<(), Error> {
+        let terminal_size = Terminal::size()?;
+        let mut pos = Position { col: 0, row: 0 };
+        for message in debug_messages {
+            pos.col = terminal_size.width - message.len();
+            Terminal::move_caret_to(pos)?;
+            Terminal::print(&message)?;
+            pos.row += 1;
+        }
+        Ok(())
+    }
+
+    pub fn print_vector(vector: &Vec<String>, fixed_index: usize) -> Result<(), Error> {
         let style = Gui::define_printing_style(fixed_index, vector.len())?;
         let terminal_size = Terminal::size()?;
         let printable_size = terminal_size.height - Self::TOP_OFFSET - Self::BOT_OFFSET;
@@ -176,7 +188,6 @@ impl Gui {
 
         /* Debug print BEGIN */
         if cfg!(debug_assertions) {
-            let mut pos = Position { col: 0, row: 0 };
             let debug = vec![
                 "DEBUG".to_string(),
                 format!("term height={}", terminal_size.height),
@@ -195,12 +206,7 @@ impl Gui {
                     PrintingStyle::FixedBottom => "style=fixed bottom".to_string(),
                 },
             ];
-            for d in debug {
-                pos.col = terminal_size.width - d.len();
-                Terminal::move_caret_to(pos)?;
-                Terminal::print(&d)?;
-                pos.row += 1;
-            }
+            Gui::print_debug(debug)?;
         }
         /* Debug print END */
 
@@ -209,7 +215,7 @@ impl Gui {
     }
 
     fn print_vector_slice(
-        vector: &Vec<&str>,
+        vector: &Vec<String>,
         fixed_index: usize,
         start: usize,
         end: usize,

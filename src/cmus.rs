@@ -3,11 +3,34 @@ use std::error::Error;
 use std::io::prelude::*;
 use std::os::unix::net::UnixStream;
 
+#[derive(Clone)]
 pub struct PlayerSongInfo {
     pub title: String,
     pub artist: String,
     pub position: usize,
 }
+
+impl PlayerSongInfo {
+    pub fn new() -> PlayerSongInfo {
+        PlayerSongInfo {
+            title: String::new(),
+            artist: String::new(),
+            position: 0,
+        }
+    }
+}
+
+impl PartialEq for PlayerSongInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.title == other.title && self.artist == other.artist
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        self.title != other.title || self.artist != other.artist
+    }
+}
+
+impl Eq for PlayerSongInfo {}
 
 pub struct Cmus {
     socket_path: String,
@@ -16,24 +39,22 @@ pub struct Cmus {
 
 const XDG_RUNTIME_DIR: &str = "XDG_RUNTIME_DIR";
 
-impl PartialEq for PlayerSongInfo {
-    fn eq(&self, other: &Self) -> bool {
-        self.title == other.title && self.artist == other.artist
-    }
-}
-
-impl Eq for PlayerSongInfo {}
-
 impl Cmus {
-    pub fn new() -> Result<Cmus, Box<dyn Error>> {
-        let mut socket_path: String = env::var(XDG_RUNTIME_DIR)?;
+    pub fn new() -> Cmus {
+        let mut socket_path: String = match env::var(XDG_RUNTIME_DIR) {
+            Ok(path) => path,
+            Err(error) => {
+                eprintln!("Error reading environment variable: {}", error);
+                std::process::exit(1);
+            }
+        };
         let status = String::new();
         socket_path.push_str("/cmus-socket");
 
-        Ok(Cmus {
+        Cmus {
             socket_path,
             status,
-        })
+        }
     }
 
     pub fn playing_song_metadata(&self) -> Result<PlayerSongInfo, Box<dyn Error>> {
@@ -53,8 +74,8 @@ impl Cmus {
         let mut response = [0; 2048];
         let mut stream = UnixStream::connect(self.socket_path.clone())?;
 
-        stream.write(b"status\n").unwrap();
-        stream.read(&mut response).unwrap();
+        stream.write(b"status\n")?;
+        stream.read(&mut response)?;
 
         let mut i = 0;
         while response[i] != 0 {
