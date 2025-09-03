@@ -1,9 +1,9 @@
 use regex::Regex;
 use std::env;
-use std::error::Error;
 use std::fs::read_to_string;
 
 use crate::cmus::PlayerSongInfo;
+use crate::error::RuntimeError;
 
 pub struct Lyric {
     timestamps: Vec<usize>,
@@ -18,10 +18,16 @@ impl Lyric {
         }
     }
 
-    fn parse_timestamp(timestamp: &str) -> Result<usize, Box<dyn Error>> {
-        let mut minutes: usize = timestamp[1..3].parse()?;
-        let mut seconds: usize = timestamp[4..6].parse()?;
-        let mut milli: usize = timestamp[7..9].parse()?;
+    fn parse_timestamp(timestamp: &str) -> Result<usize, RuntimeError> {
+        let mut minutes: usize = timestamp[1..3]
+            .parse()
+            .map_err(|_| RuntimeError::ErrorExpectedNumber)?;
+        let mut seconds: usize = timestamp[4..6]
+            .parse()
+            .map_err(|_| RuntimeError::ErrorExpectedNumber)?;
+        let mut milli: usize = timestamp[7..9]
+            .parse()
+            .map_err(|_| RuntimeError::ErrorExpectedNumber)?;
 
         minutes = minutes * 60 * 1000;
         seconds = seconds * 1000;
@@ -32,17 +38,20 @@ impl Lyric {
         Ok(minutes + seconds + milli)
     }
 
-    pub fn parse(&mut self, song: &PlayerSongInfo) -> Result<(), Box<dyn Error>> {
+    pub fn parse(&mut self, song: &PlayerSongInfo) -> Result<(), RuntimeError> {
         /* Generate filepath */
 
-        let lyric_folder = env::var("LYRICS_DIR")?.trim_end_matches('/').to_string();
+        let lyric_folder = env::var("LYRICS_DIR")
+            .map_err(|_| RuntimeError::ErrorEnvironmentVariableNotSet)?
+            .trim_end_matches('/')
+            .to_string();
         let filename = format!("{} - {}.lrc", song.artist, song.title);
         let filepath = lyric_folder + "/" + &filename;
 
         /* Parse the file */
 
-        let file_content = read_to_string(filepath)?;
-        let timestamp_regex = Regex::new(r"^\[\d{2}:\d{2}\.\d{2}]")?;
+        let file_content = read_to_string(filepath).map_err(|_| RuntimeError::ErrorFileNotFound)?;
+        let timestamp_regex = Regex::new(r"^\[\d{2}:\d{2}\.\d{2}]").unwrap();
 
         self.timestamps.clear();
         self.text.clear();

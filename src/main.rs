@@ -1,19 +1,20 @@
 use std::error::Error;
 
 mod cmus;
+mod error;
 mod gui;
 mod lyric;
 
 use crate::cmus::{Cmus, PlayerSongInfo};
+use crate::error::RuntimeError;
 use crate::gui::Gui;
 use crate::lyric::Lyric;
 
 #[derive(PartialEq)]
-enum RuntimeError {
-    PlayerUpdate,
-    LyricParse,
-    SongMetadata,
-    None,
+enum RuntimeStatus {
+    NewSong,
+    NewIndex,
+    NoUpdate,
 }
 
 struct RuntimeContext {
@@ -22,7 +23,7 @@ struct RuntimeContext {
     song: PlayerSongInfo,
     fixed_index: usize,
     valid_lyric: bool,
-    print_lyric: bool,
+    state: RuntimeStatus,
 }
 
 impl RuntimeContext {
@@ -33,7 +34,7 @@ impl RuntimeContext {
             song: PlayerSongInfo::new(),
             fixed_index: 0,
             valid_lyric: false,
-            print_lyric: false,
+            state: RuntimeStatus::NoUpdate,
         }
     }
 
@@ -45,35 +46,28 @@ impl RuntimeContext {
     }
 
     fn update(&mut self) -> Result<(), RuntimeError> {
-        self.print_lyric = false;
+        self.state = RuntimeStatus::NoUpdate;
 
-        self.player
-            .update()
-            .map_err(|_| RuntimeError::PlayerUpdate)?;
+        self.player.update()?;
 
-        let song = self
-            .player
-            .playing_song_metadata()
-            .map_err(|_| RuntimeError::SongMetadata)?;
+        let song = self.player.playing_song_metadata()?;
 
         if self.song != song {
             self.valid_lyric = false;
 
             self.song = song.clone();
-            self.lyric
-                .parse(&song)
-                .map_err(|_| RuntimeError::LyricParse)?;
+            self.lyric.parse(&song)?;
 
             self.valid_lyric = true;
-            self.print_lyric = true;
             self.fixed_index = self.lyric.get_singed_verse_index(song.position);
+            self.state = RuntimeStatus::NewSong;
             return Ok(());
         }
 
         let fixed_index = self.lyric.get_singed_verse_index(song.position);
         if fixed_index != self.fixed_index {
             self.fixed_index = fixed_index;
-            self.print_lyric = true;
+            self.state = RuntimeStatus::NewIndex;
         }
 
         Ok(())
@@ -90,27 +84,40 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn Error>> {
     let mut runtime = RuntimeContext::new();
-    let mut last_error = RuntimeError::None;
+    let mut last_error_msg = String::new();
 
     runtime.init();
 
     loop {
-        match runtime.update() {
+        let res = runtime.update();
+
+        match res {
             Ok(_) => {
-                if runtime.valid_lyric && runtime.print_lyric {
+                if runtime.valid_lyric
+                    && (runtime.state == RuntimeStatus::NewSong
+                        || runtime.state == RuntimeStatus::NewIndex)
+                {
                     Gui::print_vector(&runtime.lyric.text, runtime.fixed_index)?;
-                    last_error = RuntimeError::None;
+                    last_error_msg = "".to_string();
                 }
             }
             Err(e) => {
                 let msg = match e {
-                    RuntimeError::PlayerUpdate => "Player update error".to_string(),
-                    RuntimeError::LyricParse => "Error parsing the lyric".to_string(),
-                    RuntimeError::SongMetadata => "Error parsing song metadata".to_string(),
-                    _ => "Unknowkn error".to_string(),
+                    RuntimeError::ErrorSocketConnect => "Can't connect to CMUS socket".to_string(),
+                    RuntimeError::ErrorSocketRead => "Can't read CMUS socket".to_string(),
+                    RuntimeError::ErrorSocketWrite => "Can't write CMUS socket".to_string(),
+                    RuntimeError::ErrorExpectedNumber => "Failed parsing song metadata".to_string(),
+                    RuntimeError::ErrorEnvironmentVariableNotSet => {
+                        "Enviromental variable $LYRIC not set".to_string()
+                    }
+                    RuntimeError::ErrorFileNotFound => format!(
+                        "Lyric \"{} - {}.lrc\" not found",
+                        runtime.song.artist, runtime.song.title
+                    ),
                 };
-                if last_error != e {
-                    last_error = e;
+
+                if last_error_msg != msg || runtime.state == RuntimeStatus::NewSong {
+                    last_error_msg = msg.clone();
                     Gui::print_error(&msg)?;
                 }
             }
