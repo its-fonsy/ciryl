@@ -136,10 +136,27 @@ impl Gui {
         Ok(())
     }
 
-    pub fn print_error(string: &str) -> Result<(), Error> {
+    pub fn print_general_error(string: &str) -> Result<(), Error> {
         Terminal::clear_screen()?;
-        Terminal::move_caret_to(Position { col: 0, row: 0 })?;
+        Terminal::move_caret_to(Position {
+            col: 0,
+            row: Self::TOP_OFFSET,
+        })?;
         Terminal::print(string)?;
+        Terminal::execute()?;
+        Ok(())
+    }
+
+    pub fn print_lyric_not_found_error(artist: &str, title: &str) -> Result<(), Error> {
+        let debug = vec![
+            "Lyric not found".to_string(),
+            "".to_string(),
+            format!("Artist: {}", artist),
+            format!("Title: {}", title),
+        ];
+
+        Terminal::clear_screen()?;
+        Gui::print_vector_slice(&debug, 0, 0, debug.len())?;
         Terminal::execute()?;
         Ok(())
     }

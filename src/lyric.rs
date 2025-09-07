@@ -54,7 +54,8 @@ impl Lyric {
 
         /* Parse the file */
 
-        let file_content = read_to_string(filepath).map_err(|_| RuntimeError::ErrorFileNotFound)?;
+        let file_content =
+            read_to_string(filepath).map_err(|_| RuntimeError::ErrorLyricNotFound)?;
         let timestamp_regex = Regex::new(r"^\[\d{2}:\d{2}\.\d{2}]").unwrap();
 
         self.timestamps.clear();

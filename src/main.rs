@@ -51,11 +51,10 @@ impl RuntimeContext {
         let song = self.player.playing_song_metadata()?;
 
         if self.song != song {
+            self.state = RuntimeStatus::NewSong;
             self.song = song.clone();
             self.lyric.parse(&song)?;
-
             self.fixed_index = self.lyric.get_singed_verse_index(song.position);
-            self.state = RuntimeStatus::NewSong;
             return Ok(());
         }
 
@@ -79,7 +78,7 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn Error>> {
     let mut runtime = RuntimeContext::new();
-    let mut last_error_msg = String::new();
+    let mut last_error = RuntimeError::None;
 
     runtime.init();
 
@@ -92,30 +91,37 @@ fn run() -> Result<(), Box<dyn Error>> {
                     match runtime.state {
                         RuntimeStatus::NewSong | RuntimeStatus::NewIndex => {
                             Gui::print_vector(&runtime.lyric.text, runtime.fixed_index)?;
-                            last_error_msg = "".to_string();
+                            last_error = RuntimeError::None;
                         }
                         RuntimeStatus::NoUpdate => (),
                     }
                 }
             }
             Err(e) => {
-                let msg = match e {
-                    RuntimeError::ErrorSocketConnect => "Can't connect to CMUS socket".to_string(),
-                    RuntimeError::ErrorSocketRead => "Can't read CMUS socket".to_string(),
-                    RuntimeError::ErrorSocketWrite => "Can't write CMUS socket".to_string(),
-                    RuntimeError::ErrorExpectedNumber => "Failed parsing song metadata".to_string(),
-                    RuntimeError::ErrorEnvironmentVariableNotSet => {
-                        "Enviromental variable $LYRIC not set".to_string()
-                    }
-                    RuntimeError::ErrorFileNotFound => format!(
-                        "Lyric \"{} - {}.lrc\" not found",
-                        runtime.song.artist, runtime.song.title
-                    ),
-                };
-
-                if last_error_msg != msg || runtime.state == RuntimeStatus::NewSong {
-                    last_error_msg = msg.clone();
-                    Gui::print_error(&msg)?;
+                if last_error != e || runtime.state == RuntimeStatus::NewSong {
+                    last_error = e;
+                    match e {
+                        RuntimeError::ErrorSocketConnect => {
+                            Gui::print_general_error("Can't connect to CMUS socket")?
+                        }
+                        RuntimeError::ErrorSocketRead => {
+                            Gui::print_general_error("Can't read CMUS socket")?
+                        }
+                        RuntimeError::ErrorSocketWrite => {
+                            Gui::print_general_error("Can't write CMUS socket")?
+                        }
+                        RuntimeError::ErrorExpectedNumber => {
+                            Gui::print_general_error("Failed parsing song metadata")?
+                        }
+                        RuntimeError::ErrorEnvironmentVariableNotSet => {
+                            Gui::print_general_error("Enviromental variable $LYRIC not set")?
+                        }
+                        RuntimeError::ErrorLyricNotFound => Gui::print_lyric_not_found_error(
+                            &runtime.song.artist,
+                            &runtime.song.title,
+                        )?,
+                        _ => (),
+                    };
                 }
             }
         }
