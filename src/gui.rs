@@ -163,7 +163,10 @@ impl Gui {
         let start;
         let end;
 
-        Terminal::clear_screen()?;
+        if cfg!(debug_assertions) {
+            Terminal::clear_screen()?;
+        }
+
         match style {
             PrintingStyle::FixedTop => {
                 start = 0;
@@ -220,12 +223,14 @@ impl Gui {
         start: usize,
         end: usize,
     ) -> Result<(), Error> {
+        let term_size = Terminal::size()?;
         let mut cursor = Position {
             col: 0,
             row: Gui::TOP_OFFSET,
         };
 
         for (index, text) in vector[start..end].iter().enumerate() {
+            cursor.col = term_size.width / 2 - text.len() / 2;
             Terminal::move_caret_to(cursor)?;
             Terminal::clear_line()?;
             if (start + index) == fixed_index {
