@@ -22,7 +22,6 @@ struct RuntimeContext {
     lyric: Lyric,
     song: PlayerSongInfo,
     fixed_index: usize,
-    valid_lyric: bool,
     state: RuntimeStatus,
 }
 
@@ -33,7 +32,6 @@ impl RuntimeContext {
             lyric: Lyric::new(),
             song: PlayerSongInfo::new(),
             fixed_index: 0,
-            valid_lyric: false,
             state: RuntimeStatus::NoUpdate,
         }
     }
@@ -53,12 +51,9 @@ impl RuntimeContext {
         let song = self.player.playing_song_metadata()?;
 
         if self.song != song {
-            self.valid_lyric = false;
-
             self.song = song.clone();
             self.lyric.parse(&song)?;
 
-            self.valid_lyric = true;
             self.fixed_index = self.lyric.get_singed_verse_index(song.position);
             self.state = RuntimeStatus::NewSong;
             return Ok(());
@@ -93,12 +88,14 @@ fn run() -> Result<(), Box<dyn Error>> {
 
         match res {
             Ok(_) => {
-                if runtime.valid_lyric
-                    && (runtime.state == RuntimeStatus::NewSong
-                        || runtime.state == RuntimeStatus::NewIndex)
-                {
-                    Gui::print_vector(&runtime.lyric.text, runtime.fixed_index)?;
-                    last_error_msg = "".to_string();
+                if runtime.lyric.valid {
+                    match runtime.state {
+                        RuntimeStatus::NewSong | RuntimeStatus::NewIndex => {
+                            Gui::print_vector(&runtime.lyric.text, runtime.fixed_index)?;
+                            last_error_msg = "".to_string();
+                        }
+                        RuntimeStatus::NoUpdate => (),
+                    }
                 }
             }
             Err(e) => {

@@ -8,6 +8,7 @@ use crate::error::RuntimeError;
 pub struct Lyric {
     timestamps: Vec<usize>,
     pub text: Vec<String>,
+    pub valid: bool,
 }
 
 impl Lyric {
@@ -15,6 +16,7 @@ impl Lyric {
         Lyric {
             timestamps: Vec::new(),
             text: Vec::new(),
+            valid: false,
         }
     }
 
@@ -40,6 +42,8 @@ impl Lyric {
 
     pub fn parse(&mut self, song: &PlayerSongInfo) -> Result<(), RuntimeError> {
         /* Generate filepath */
+
+        self.valid = false;
 
         let lyric_folder = env::var("LYRICS_DIR")
             .map_err(|_| RuntimeError::ErrorEnvironmentVariableNotSet)?
@@ -67,6 +71,7 @@ impl Lyric {
             self.text.push(text);
         }
 
+        self.valid = true;
         Ok(())
     }
 
