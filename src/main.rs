@@ -90,6 +90,9 @@ fn run() -> Result<(), Box<dyn Error>> {
                 if runtime.lyric.valid {
                     match runtime.state {
                         RuntimeStatus::NewSong | RuntimeStatus::NewIndex => {
+                            if runtime.state == RuntimeStatus::NewSong {
+                                Gui::clear_screen()?;
+                            }
                             Gui::print_vector(&runtime.lyric.text, runtime.fixed_index)?;
                             last_error = RuntimeError::None;
                         }

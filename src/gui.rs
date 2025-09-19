@@ -136,6 +136,11 @@ impl Gui {
         Ok(())
     }
 
+    pub fn clear_screen() -> Result<(), Error> {
+        Terminal::clear_screen()?;
+        Ok(())
+    }
+
     pub fn print_general_error(string: &str) -> Result<(), Error> {
         Terminal::clear_screen()?;
         Terminal::move_caret_to(Position {
@@ -247,15 +252,26 @@ impl Gui {
         };
 
         for (index, text) in vector[start..end].iter().enumerate() {
-            cursor.col = term_size.width / 2 - text.len() / 2;
+            let t = if text.len() >= term_size.width {
+                &text[..term_size.width]
+            } else {
+                text.as_str()
+            };
+
+            cursor.col = if text.len() >= term_size.width {
+                0
+            } else {
+                term_size.width / 2 - text.len() / 2
+            };
+
             Terminal::move_caret_to(cursor)?;
             Terminal::clear_line()?;
             if (start + index) == fixed_index {
                 Terminal::set_bold_attribute()?;
-                Terminal::print(text)?;
+                Terminal::print(t)?;
                 Terminal::reset_attributes()?;
             } else {
-                Terminal::print(text)?;
+                Terminal::print(t)?;
             }
             cursor.row += 1;
         }
