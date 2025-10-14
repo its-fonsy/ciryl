@@ -2,7 +2,7 @@ use std::env;
 use std::io::prelude::*;
 use std::os::unix::net::UnixStream;
 
-use crate::error::RuntimeError;
+use crate::runtime::RuntimeError;
 
 #[derive(Clone)]
 pub struct PlayerSongInfo {

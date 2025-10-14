@@ -3,7 +3,7 @@ use std::env;
 use std::fs::read_to_string;
 
 use crate::cmus::PlayerSongInfo;
-use crate::error::RuntimeError;
+use crate::runtime::RuntimeError;
 
 pub struct Lyric {
     timestamps: Vec<usize>,
