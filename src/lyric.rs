@@ -45,11 +45,23 @@ impl Lyric {
 
         self.valid = false;
 
+        let invalid_char = [
+            '!', '@', '#', '$', '%', '^', '&', '*', '_', '+', '=', ';', '\'', ':', '"', ',', '<',
+            '>', '/', '?', '\\', '|',
+        ];
+
         let lyric_folder = env::var("LYRICS_DIR")
             .map_err(|_| RuntimeError::ErrorEnvironmentVariableNotSet)?
             .trim_end_matches('/')
             .to_string();
-        let filename = format!("{} - {}.lrc", song.artist, song.title);
+
+        let artist = song.artist.to_lowercase();
+        let artist = artist.replace(&invalid_char[..], "");
+
+        let title = song.title.to_lowercase();
+        let title = title.replace(&invalid_char[..], "");
+
+        let filename = format!("{} - {}.lrc", artist, title);
         let filepath = lyric_folder + "/" + &filename;
 
         /* Parse the file */
