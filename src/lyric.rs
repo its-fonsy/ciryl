@@ -1,3 +1,4 @@
+use md5;
 use regex::Regex;
 use std::env;
 use std::fs::read_to_string;
@@ -41,27 +42,14 @@ impl Lyric {
     }
 
     pub fn parse(&mut self, song: &PlayerSongInfo) -> Result<(), RuntimeError> {
-        /* Generate filepath */
-
-        self.valid = false;
-
-        let invalid_char = [
-            '!', '@', '#', '$', '%', '^', '&', '*', '_', '+', '=', ';', '\'', ':', '"', ',', '<',
-            '>', '/', '?', '\\', '|',
-        ];
-
         let lyric_folder = env::var("LYRICS_DIR")
             .map_err(|_| RuntimeError::ErrorEnvironmentVariableNotSet)?
             .trim_end_matches('/')
             .to_string();
 
-        let artist = song.artist.to_lowercase();
-        let artist = artist.replace(&invalid_char[..], "");
+        let digest = md5::compute(format!("{}{}", song.artist, song.title).as_bytes());
 
-        let title = song.title.to_lowercase();
-        let title = title.replace(&invalid_char[..], "");
-
-        let filename = format!("{} - {}.lrc", artist, title);
+        let filename = format!("{:x}.lrc", digest);
         let filepath = lyric_folder + "/" + &filename;
 
         /* Parse the file */

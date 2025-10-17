@@ -3,6 +3,7 @@ use crossterm::event::{Event, KeyCode};
 use crossterm::style::{Attribute, Print, SetAttribute};
 use crossterm::terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode, size};
 use crossterm::{Command, queue};
+use md5;
 use std::io::{Error, Write, stdout};
 
 #[derive(Default, Copy, Clone)]
@@ -153,11 +154,13 @@ impl Gui {
     }
 
     pub fn print_lyric_not_found_error(artist: &str, title: &str) -> Result<(), Error> {
+        let digest = md5::compute(format!("{}{}", artist, title).as_bytes());
         let debug = vec![
             "Lyric not found".to_string(),
             "".to_string(),
             format!("Artist: {}", artist),
             format!("Title: {}", title),
+            format!("{:x}", digest),
         ];
 
         Terminal::clear_screen()?;
