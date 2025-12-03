@@ -3,13 +3,14 @@ use regex::Regex;
 use std::env;
 use std::fs::read_to_string;
 
-use crate::cmus::PlayerSongInfo;
 use crate::runtime::RuntimeError;
+use crate::runtime::cmus::PlayerSongInfo;
+
+type Result<T> = std::result::Result<T, RuntimeError>;
 
 pub struct Lyric {
     timestamps: Vec<usize>,
     pub text: Vec<String>,
-    pub valid: bool,
 }
 
 impl Lyric {
@@ -17,20 +18,13 @@ impl Lyric {
         Lyric {
             timestamps: Vec::new(),
             text: Vec::new(),
-            valid: false,
         }
     }
 
-    fn parse_timestamp(timestamp: &str) -> Result<usize, RuntimeError> {
-        let mut minutes: usize = timestamp[1..3]
-            .parse()
-            .map_err(|_| RuntimeError::ErrorExpectedNumber)?;
-        let mut seconds: usize = timestamp[4..6]
-            .parse()
-            .map_err(|_| RuntimeError::ErrorExpectedNumber)?;
-        let mut milli: usize = timestamp[7..9]
-            .parse()
-            .map_err(|_| RuntimeError::ErrorExpectedNumber)?;
+    fn parse_timestamp(timestamp: &str) -> Result<usize> {
+        let mut minutes: usize = timestamp[1..3].parse()?;
+        let mut seconds: usize = timestamp[4..6].parse()?;
+        let mut milli: usize = timestamp[7..9].parse()?;
 
         minutes = minutes * 60 * 1000;
         seconds = seconds * 1000;
@@ -41,9 +35,9 @@ impl Lyric {
         Ok(minutes + seconds + milli)
     }
 
-    pub fn parse(&mut self, song: &PlayerSongInfo) -> Result<(), RuntimeError> {
+    pub fn parse(&mut self, song: &PlayerSongInfo) -> Result<()> {
         let lyric_folder = env::var("LYRICS_DIR")
-            .map_err(|_| RuntimeError::ErrorEnvironmentVariableNotSet)?
+            .map_err(|_| RuntimeError::LyricDirEnvNotSet)?
             .trim_end_matches('/')
             .to_string();
 
@@ -54,8 +48,11 @@ impl Lyric {
 
         /* Parse the file */
 
-        let file_content =
-            read_to_string(filepath).map_err(|_| RuntimeError::ErrorLyricNotFound)?;
+        let file_content = match read_to_string(filepath) {
+            Ok(content) => content,
+            Err(_) => return Err(RuntimeError::LyricNotFound),
+        };
+
         let timestamp_regex = Regex::new(r"^\[\d{2}:\d{2}\.\d{2}]").unwrap();
 
         self.timestamps.clear();
@@ -72,7 +69,6 @@ impl Lyric {
             self.text.push(text);
         }
 
-        self.valid = true;
         Ok(())
     }
 

@@ -1,72 +1,136 @@
-use crate::cmus::{Cmus, PlayerSongInfo};
-use crate::gui::Gui;
-use crate::lyric::Lyric;
+mod cmus;
+mod error;
+mod gui;
+mod lyric;
 
-#[derive(PartialEq, Clone, Copy)]
-pub enum RuntimeError {
-    ErrorSocketConnect,
-    ErrorSocketRead,
-    ErrorSocketWrite,
-    ErrorExpectedNumber,
-    ErrorEnvironmentVariableNotSet,
-    ErrorLyricNotFound,
-    None,
+use cmus::{Cmus, PlayerSongInfo};
+use error::RuntimeError;
+use gui::Gui;
+use lyric::Lyric;
+
+type Result<T> = std::result::Result<T, RuntimeError>;
+
+pub enum RuntimeReturn {
+    Continue,
+    Exit,
 }
 
 #[derive(PartialEq)]
-pub enum RuntimeStatus {
+enum RuntimeUpdate {
     NewSong,
     NewIndex,
-    NoUpdate,
+    Nop,
+    LyricNotFound,
+    LyricDirNotSet,
+    CmusError,
+    ParseError,
+    DisplayError,
 }
 
-pub struct RuntimeContext {
-    pub player: Cmus,
-    pub lyric: Lyric,
-    pub song: PlayerSongInfo,
-    pub fixed_index: usize,
-    pub state: RuntimeStatus,
+pub struct CirylRuntime {
+    player: Cmus,
+    lyric: Lyric,
+    song: PlayerSongInfo,
+    fixed_index: usize,
+    initialized: bool,
+    last_update: RuntimeUpdate,
 }
 
-impl RuntimeContext {
-    pub fn new() -> RuntimeContext {
-        RuntimeContext {
+impl CirylRuntime {
+    pub fn new() -> CirylRuntime {
+        CirylRuntime {
             player: Cmus::new(),
             lyric: Lyric::new(),
             song: PlayerSongInfo::new(),
             fixed_index: 0,
-            state: RuntimeStatus::NoUpdate,
+            initialized: false,
+            last_update: RuntimeUpdate::Nop,
         }
     }
 
-    pub fn init(&mut self) {
-        Gui::initialize().unwrap_or_else(|error| {
-            eprintln!("Error initializing the GUI: {}", error);
-            std::process::exit(1);
-        });
-    }
+    fn update(&mut self) -> RuntimeUpdate {
+        if let Err(_) = self.player.update() {
+            return RuntimeUpdate::CmusError;
+        };
 
-    pub fn update(&mut self) -> Result<(), RuntimeError> {
-        self.state = RuntimeStatus::NoUpdate;
-
-        self.player.update()?;
-
-        let song = self.player.playing_song_metadata()?;
+        let song = match self.player.playing_song_metadata() {
+            Ok(metadata) => metadata,
+            Err(_) => return RuntimeUpdate::ParseError,
+        };
 
         if self.song != song {
-            self.state = RuntimeStatus::NewSong;
             self.song = song.clone();
-            self.lyric.parse(&song)?;
+            if let Err(err) = self.lyric.parse(&song) {
+                return match err {
+                    RuntimeError::LyricNotFound => RuntimeUpdate::LyricNotFound,
+                    RuntimeError::LyricDirEnvNotSet => RuntimeUpdate::LyricDirNotSet,
+                    _ => RuntimeUpdate::ParseError,
+                };
+            };
             self.fixed_index = self.lyric.get_singed_verse_index(song.position);
-            return Ok(());
+            return RuntimeUpdate::NewSong;
+        }
+
+        if self.last_update == RuntimeUpdate::DisplayError {
+            return RuntimeUpdate::DisplayError;
         }
 
         let fixed_index = self.lyric.get_singed_verse_index(song.position);
         if fixed_index != self.fixed_index {
             self.fixed_index = fixed_index;
-            self.state = RuntimeStatus::NewIndex;
+            return RuntimeUpdate::NewIndex;
         }
 
-        Ok(())
+        RuntimeUpdate::Nop
+    }
+
+    pub fn task(&mut self) -> Result<RuntimeReturn> {
+        if !self.initialized {
+            Gui::initialize()?;
+            self.initialized = true;
+        }
+
+        let update = self.update();
+
+        match update {
+            RuntimeUpdate::NewSong => {
+                Gui::clear_screen()?;
+                Gui::print_vector(&self.lyric.text, self.fixed_index)?;
+            }
+            RuntimeUpdate::NewIndex => Gui::print_vector(&self.lyric.text, self.fixed_index)?,
+            RuntimeUpdate::CmusError => Gui::print_general_error("Can't connect to CMUS socket")?,
+            RuntimeUpdate::ParseError => Gui::print_general_error("Can't parse playing song")?,
+            RuntimeUpdate::LyricDirNotSet => {
+                Gui::print_general_error("LYRIC_DIR environment directory not set")?
+            }
+            RuntimeUpdate::LyricNotFound => {
+                Gui::print_lyric_not_found_error(&self.song.artist, &self.song.title)?
+            }
+            RuntimeUpdate::DisplayError => {}
+            RuntimeUpdate::Nop => {}
+        }
+
+        self.last_update = match update {
+            RuntimeUpdate::CmusError
+            | RuntimeUpdate::ParseError
+            | RuntimeUpdate::LyricDirNotSet
+            | RuntimeUpdate::LyricNotFound
+            | RuntimeUpdate::DisplayError => RuntimeUpdate::DisplayError,
+            RuntimeUpdate::NewSong => RuntimeUpdate::NewSong,
+            RuntimeUpdate::NewIndex => RuntimeUpdate::NewIndex,
+            RuntimeUpdate::Nop => RuntimeUpdate::Nop,
+        };
+
+        match Gui::pool_keyboard()? {
+            Some(key) => {
+                if key == 'q' {
+                    Gui::terminate()?;
+                    return Ok(RuntimeReturn::Exit);
+                }
+            }
+            None => {}
+        }
+
+        Ok(RuntimeReturn::Continue)
     }
 }

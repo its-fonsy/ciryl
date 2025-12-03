@@ -4,6 +4,8 @@ use std::os::unix::net::UnixStream;
 
 use crate::runtime::RuntimeError;
 
+type Result<T> = std::result::Result<T, RuntimeError>;
+
 #[derive(Clone)]
 pub struct PlayerSongInfo {
     pub title: String,
@@ -58,13 +60,10 @@ impl Cmus {
         }
     }
 
-    pub fn playing_song_metadata(&self) -> Result<PlayerSongInfo, RuntimeError> {
+    pub fn playing_song_metadata(&self) -> Result<PlayerSongInfo> {
         let title = self.parse_status("tag title");
         let artist = self.parse_status("tag artist");
-        let position: usize = self
-            .parse_status("position")
-            .parse()
-            .map_err(|_| RuntimeError::ErrorExpectedNumber)?;
+        let position: usize = self.parse_status("position").parse()?;
         let position = position * 1000;
 
         Ok(PlayerSongInfo {
@@ -74,17 +73,12 @@ impl Cmus {
         })
     }
 
-    pub fn update(&mut self) -> Result<(), RuntimeError> {
+    pub fn update(&mut self) -> Result<()> {
         let mut response = [0; 2048];
-        let mut stream = UnixStream::connect(self.socket_path.clone())
-            .map_err(|_| RuntimeError::ErrorSocketConnect)?;
+        let mut stream = UnixStream::connect(self.socket_path.clone())?;
 
-        stream
-            .write(b"status\n")
-            .map_err(|_| RuntimeError::ErrorSocketWrite)?;
-        stream
-            .read(&mut response)
-            .map_err(|_| RuntimeError::ErrorSocketRead)?;
+        stream.write(b"status\n")?;
+        stream.read(&mut response)?;
 
         let mut i = 0;
         while response[i] != 0 {
