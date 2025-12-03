@@ -10,6 +10,12 @@ Clone the repo, build and install
 ```
 git clone https://github.com/its-fonsy/ciryl
 cd ciryl
+make install
+```
+
+or build and install manually
+
+```
 cargo build -r
 install -m 755 target/release/ciryl <install-path>
 ```
@@ -19,8 +25,8 @@ install -m 755 target/release/ciryl <install-path>
 The lyric filename is the computed MD5 using song artist and title as input.
 This is done to avoid strange for the filesystem.
 
-More precisely the input is "<artist><title>" and the file must be named
-"<digest>.lrc".
+More precisely the input is "\<artist\>\<title\>" and the file must be named
+"\<digest\>.lrc".
 
 In case that the application doesn't find the corresponding lyric file, it will
 display artist, title and the expected digest.

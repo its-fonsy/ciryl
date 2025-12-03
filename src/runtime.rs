@@ -60,13 +60,14 @@ impl CirylRuntime {
 
         if self.song != song {
             self.song = song.clone();
-            if let Err(err) = self.lyric.parse(&song) {
-                return match err {
-                    RuntimeError::LyricNotFound => RuntimeUpdate::LyricNotFound,
-                    RuntimeError::LyricDirEnvNotSet => RuntimeUpdate::LyricDirNotSet,
-                    _ => RuntimeUpdate::ParseError,
-                };
+
+            match self.lyric.parse(&song) {
+                Ok(_) => {}
+                Err(RuntimeError::LyricNotFound) => return RuntimeUpdate::LyricNotFound,
+                Err(RuntimeError::LyricDirEnvNotSet) => return RuntimeUpdate::LyricDirNotSet,
+                Err(_) => return RuntimeUpdate::ParseError,
             };
+
             self.fixed_index = self.lyric.get_singed_verse_index(song.position);
             return RuntimeUpdate::NewSong;
         }
