@@ -50,12 +50,20 @@ impl CirylRuntime {
 
     fn update(&mut self) -> RuntimeUpdate {
         if let Err(_) = self.player.update() {
-            return RuntimeUpdate::CmusError;
+            return match self.last_update {
+                RuntimeUpdate::DisplayError => RuntimeUpdate::DisplayError,
+                _ => RuntimeUpdate::CmusError,
+            };
         };
 
         let song = match self.player.playing_song_metadata() {
             Ok(metadata) => metadata,
-            Err(_) => return RuntimeUpdate::ParseError,
+            Err(_) => {
+                return match self.last_update {
+                    RuntimeUpdate::DisplayError => RuntimeUpdate::DisplayError,
+                    _ => RuntimeUpdate::ParseError,
+                };
+            }
         };
 
         if self.song != song {
