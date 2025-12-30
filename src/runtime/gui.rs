@@ -114,8 +114,8 @@ impl Terminal {
 }
 
 impl Gui {
-    const TOP_OFFSET: usize = 1;
-    const BOT_OFFSET: usize = 1;
+    const TOP_OFFSET: usize = 2;
+    const BOT_OFFSET: usize = 2;
 
     pub fn initialize() -> Result<(), Error> {
         Terminal::initialize()?;
