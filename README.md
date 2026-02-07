@@ -1,7 +1,13 @@
 ## Cyril
 
-Cyril is a TUI that display the lyric of the song currently playing on cmus.
+Cyril is a TUI that displays the lyric of the song currently playing on cmus.
 It will search for lyric files inside `$LYRICS_DIR` environment variable.
+
+The following image shows how it looks with Granite by Sleep Token.
+
+<p align="center">
+  <img src="assets/screenshot_600x480.png">
+</p>
 
 ### Build and install
 
@@ -24,18 +30,24 @@ install -m 755 target/release/ciryl <install-path>
 ### Lyric filename
 
 The lyric filename is the computed MD5 using song artist and title as input.
-This is done to avoid strange for the filesystem.
+This is done to avoid invalid filenames for the filesystem.
 
 More precisely the input is "\<artist\>\<title\>" and the file must be named
 "\<digest\>.lrc".
 
-In case that the application doesn't find the corresponding lyric file, it will
-display artist, title and the expected digest.
+If the application doesn't find the corresponding lyric file, it will display
+artist, title and the expected digest. The image below shows this scenario
 
-*Example*
+<p align="center">
+  <img src="assets/lyric_not_found_600x480.png">
+</p>
+
+#### Example
 
 If the song playing on cmus is "One Step Closer" by "Linkin Park" then the
-input string is "Linkin ParkOne Step Closer". Using `md5sum`, the digest will be
+input string is "Linkin ParkOne Step Closer".
+
+Using `md5sum`, the digest can be computed
 
 ```
 $ echo -n "Linkin ParkOne Step Closer" | md5sum
