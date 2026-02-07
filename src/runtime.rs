@@ -132,10 +132,18 @@ impl CirylRuntime {
 
         match Gui::pool_keyboard()? {
             Some(key) => {
-                if key == 'q' {
-                    Gui::terminate()?;
-                    return Ok(RuntimeReturn::Exit);
-                }
+                match key {
+                    /* Press 'q' to quit */
+                    'q' => {
+                        Gui::terminate()?;
+                        return Ok(RuntimeReturn::Exit);
+                    },
+                    /* Press 'r' to retry song parsing */
+                    'r' => {
+                        self.song = PlayerSongInfo::new();
+                    }
+                    _ => {},
+                };
             }
             None => {}
         }
