@@ -104,9 +104,9 @@ impl CirylRuntime {
         match update {
             RuntimeUpdate::NewSong => {
                 Gui::clear_screen()?;
-                Gui::print_vector(&self.lyric.text, self.fixed_index)?;
+                // Gui::print_vector(&self.lyric.text, self.fixed_index)?;
             }
-            RuntimeUpdate::NewIndex => Gui::print_vector(&self.lyric.text, self.fixed_index)?,
+            RuntimeUpdate::NewIndex => {},/* )Gui::print_vector(&self.lyric.verses, self.fixed_index)?, */
             RuntimeUpdate::CmusError => Gui::print_general_error("Can't connect to CMUS socket")?,
             RuntimeUpdate::ParseError => Gui::print_general_error("Can't parse playing song")?,
             RuntimeUpdate::LyricDirNotSet => {

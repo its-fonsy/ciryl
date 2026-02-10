@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+
 mod runtime;
 
 use crate::runtime::{CirylRuntime, RuntimeReturn};
