@@ -155,13 +155,12 @@ impl Gui {
 
     pub fn print_lyric_not_found_error(artist: &str, title: &str) -> Result<(), Error> {
         let digest = md5::compute(format!("{}{}", artist, title).as_bytes());
-        let debug = vec![
-            "Lyric not found".to_string(),
-            "".to_string(),
-            format!("Artist: {}", artist),
-            format!("Title: {}", title),
-            format!("{:x}", digest),
-        ];
+
+        let artist_msg: String = format!("Artist: {}", artist);
+        let title_msg: String = format!("Title: {}", title);
+        let digest_msg: String = format!("{:x}", digest);
+
+        let debug = vec!["Lyric not found", "", artist_msg.as_str(), title_msg.as_str(), digest_msg.as_str()];
 
         Terminal::clear_screen()?;
         Gui::print_vector_slice(&debug, 0, 0, debug.len())?;
@@ -181,7 +180,7 @@ impl Gui {
         Ok(())
     }
 
-    pub fn print_vector(vector: &Vec<String>, fixed_index: usize) -> Result<(), Error> {
+    pub fn print_vector(vector: &Vec<&str>, fixed_index: usize) -> Result<(), Error> {
         let style = Gui::define_printing_style(fixed_index, vector.len())?;
         let terminal_size = Terminal::size()?;
         let printable_size = terminal_size.height - Self::TOP_OFFSET - Self::BOT_OFFSET;
@@ -215,6 +214,7 @@ impl Gui {
         };
 
         /* Debug print BEGIN */
+
         if cfg!(debug_assertions) {
             let debug = vec![
                 "DEBUG".to_string(),
@@ -236,6 +236,7 @@ impl Gui {
             ];
             Gui::print_debug(debug)?;
         }
+
         /* Debug print END */
 
         Terminal::execute()?;
@@ -243,7 +244,7 @@ impl Gui {
     }
 
     fn print_vector_slice(
-        vector: &Vec<String>,
+        vector: &Vec<&str>,
         fixed_index: usize,
         start: usize,
         end: usize,
@@ -258,7 +259,7 @@ impl Gui {
             let t = if text.len() >= term_size.width {
                 &text[..term_size.width]
             } else {
-                text.as_str()
+                text
             };
 
             cursor.col = if text.len() >= term_size.width {
