@@ -7,13 +7,14 @@ use crate::runtime::cmus::PlayerSongInfo;
 
 type Result<T> = std::result::Result<T, RuntimeError>;
 
+#[derive(Ord, Eq, PartialOrd, PartialEq)]
 pub struct Verse {
     pub timestamp: usize,
     pub text: String,
 }
 
 pub struct Lyric {
-    pub verses: Vec<Verse>,
+    verses: Vec<Verse>,
 }
 
 enum LineParseState {
@@ -25,6 +26,10 @@ enum LineParseState {
 impl Lyric {
     pub fn new() -> Lyric {
         Lyric { verses: Vec::new() }
+    }
+
+    pub fn get_text(&self) -> Vec<&str> {
+        self.verses.iter().map(|v| v.text.as_str()).collect()
     }
 
     fn parse_timestamp(timestamp: &str) -> Result<usize> {
@@ -60,25 +65,26 @@ impl Lyric {
         };
 
         self.verses.clear();
+
         for line in file_content.lines() {
             self.parse_line(line);
         }
 
+        self.verses.sort();
+
         Ok(())
     }
 
-    fn parse_line_timestamps(line: &str) -> (Vec<usize>, usize) {
+    fn parse_line_timestamps(line: &str) -> Vec<usize> {
         let mut state: LineParseState = LineParseState::ParseInit;
         let mut buff: String = String::new();
         let mut timestamps: Vec<usize> = Vec::new();
-        let mut last_closing_bracket_pos: usize = 0;
 
         buff.clear();
-        for (index, char) in line.char_indices() {
+        for char in line.chars() {
             match state {
                 LineParseState::ParseInit => {
                     if char == '[' {
-                        println!("inside square bracket");
                         state = LineParseState::InsideSquareBracket;
                     } else {
                         break;
@@ -86,19 +92,13 @@ impl Lyric {
                 }
                 LineParseState::InsideSquareBracket => {
                     if char != ']' {
-                        println!("pushing {char}");
                         buff.push(char);
                     } else {
-                        println!("got {buff}");
-                        last_closing_bracket_pos = index;
                         match Lyric::parse_timestamp(buff.as_str()) {
                             Ok(res) => {
-                                println!("pushing {res} in timestamps");
                                 timestamps.push(res);
                             }
-                            Err(_) => {
-                                println!("error!")
-                            }
+                            Err(_) => {}
                         };
                         buff.clear();
                         state = LineParseState::OutsideSquareBracket;
@@ -112,15 +112,26 @@ impl Lyric {
             };
         }
 
-        (timestamps, last_closing_bracket_pos)
+        timestamps
+    }
+
+    fn parse_line_text(line: &str) -> &str {
+        let text_begin: usize = line.rfind(']').unwrap() + 1;
+
+        let verse_text: &str = if text_begin < line.len() {
+            line[text_begin..].trim()
+        } else {
+            ""
+        };
+
+        verse_text
     }
 
     fn parse_line(&mut self, line: &str) {
         let line: &str = line.trim();
 
-        let (timestamps, last_square_bracket_pos): (Vec<usize>, usize) =
-            Lyric::parse_line_timestamps(line);
-        let verse_text: &str = line[(last_square_bracket_pos + 1)..].trim();
+        let timestamps: Vec<usize> = Lyric::parse_line_timestamps(line);
+        let verse_text: &str = Lyric::parse_line_text(line);
 
         for timestamp in timestamps {
             let verse = Verse {
@@ -156,15 +167,48 @@ mod tests {
     #[test]
     fn single_timestamp() {
         let line: &str = "[00:34.88] This is a verse";
-        let (timestamps, pos): (Vec<usize>, usize) = Lyric::parse_line_timestamps(line);
+        let timestamps: Vec<usize> = Lyric::parse_line_timestamps(line);
+        let verse_text: &str = Lyric::parse_line_text(line);
+
         assert_eq!(timestamps, vec![34880]);
-        assert_eq!(pos, 9);
+        assert_eq!(verse_text, "This is a verse");
+    }
+
+    #[test]
+    fn single_character() {
+        let line: &str = "[00:34.88]    O   ";
+        let verse_text: &str = Lyric::parse_line_text(line);
+        assert_eq!(verse_text, "O");
+    }
+
+    #[test]
+    fn no_text() {
+        let line: &str = "[12:34.56] [11:22.33]   [43:21:67]      ";
+        let verse_text: &str = Lyric::parse_line_text(line);
+        assert_eq!(verse_text, "");
+    }
+
+    #[test]
+    fn wrongly_formatted_verse() {
+        let line: &str = "[12:334.56] abcd";
+        let timestamps: Vec<usize> = Lyric::parse_line_timestamps(line);
+        assert!(timestamps.is_empty());
+
+        let line: &str = "[12:34.56 abcd";
+        let timestamps: Vec<usize> = Lyric::parse_line_timestamps(line);
+        assert!(timestamps.is_empty());
+
+        let line: &str = "12:34.56] abcd";
+        let timestamps: Vec<usize> = Lyric::parse_line_timestamps(line);
+        assert!(timestamps.is_empty());
     }
 
     #[test]
     fn multi_timestamp() {
         let line: &str = "[00:34.88][01:22.33] [10:59.67] This is a verse";
-        let (timestamps, pos): (Vec<usize>, usize) = Lyric::parse_line_timestamps(line);
+        let timestamps: Vec<usize> = Lyric::parse_line_timestamps(line);
+        let verse_text: &str = Lyric::parse_line_text(line);
+
         assert_eq!(
             timestamps,
             vec![
@@ -173,6 +217,6 @@ mod tests {
                 60000 * 10 + 59 * 1000 + 670
             ]
         );
-        assert_eq!(pos, 30);
+        assert_eq!(verse_text, "This is a verse");
     }
 }
